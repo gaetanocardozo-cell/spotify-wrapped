@@ -147,3 +147,68 @@ Read-only. Nothing that can modify your account, playlists, or playback.
 Step 4 is the one that matters today. Everything else we can build at any time; history
 only accumulates once the collector is live — so the sooner it's running, the further back
 your first real Wrapped will reach.
+
+---
+
+# Running the collector (do this next)
+
+The Arena sandbox cannot reach Spotify or Supabase (its egress is allowlisted to
+package registries), so the one-time connect must happen on your machine.
+
+```bash
+git pull
+npm install
+```
+
+### 1. Create `.env.local`
+
+It is gitignored, so it does not travel with the repo. Copy `.env.example` and fill in:
+
+```bash
+DATABASE_DRIVER=postgres
+DATABASE_URL=<your session pooler string>
+
+SPOTIFY_CLIENT_ID=<from the dashboard>
+SPOTIFY_CLIENT_SECRET=<from the dashboard>
+
+APP_TIMEZONE=America/Bogota
+TOKEN_ENCRYPTION_KEY=<openssl rand -base64 32>
+CRON_SECRET=<openssl rand -hex 32>
+```
+
+### 2. Verify the database, then migrate
+
+```bash
+npm run db:check     # confirms the connection string actually works
+npm run db:migrate   # creates the schema in Supabase
+```
+
+### 3. Connect Spotify
+
+```bash
+npm run dev
+```
+
+Open **http://127.0.0.1:3000** — not `localhost`, which Spotify rejects — and click
+**Connect Spotify**. From this moment your listening history starts accumulating.
+
+### 4. Confirm collection works
+
+```bash
+curl "http://127.0.0.1:3000/api/cron/ingest?secret=$CRON_SECRET"
+```
+
+Expect `{"ok":true,"playsFetched":N,...}`. Play something on Spotify for 30+ seconds,
+wait a minute, and run it again — `playsInserted` should increase.
+
+A `"warning"` about a saturated page means the 50-item ceiling was hit and some plays
+were missed; poll more frequently.
+
+### 5. Deploy so it runs without your laptop
+
+Import the repo on Vercel, set the same environment variables, and add
+`https://<your-app>.vercel.app/api/auth/callback` to the Spotify app's redirect URIs.
+`vercel.json` already schedules the collector every 15 minutes.
+
+You will need to click **Connect Spotify** once on the deployed URL too, since the
+encrypted refresh token is tied to the redirect URI it was issued for.

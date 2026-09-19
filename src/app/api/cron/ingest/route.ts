@@ -29,9 +29,15 @@ async function handle(request: Request) {
   await migrate(db, false);
 
   const account = await getAccount(db);
-  if (!account) {
+  // 428 Precondition Required: the operator must connect Spotify first. This
+  // is a setup state, not a server fault, so don't report it as a 500.
+  if (!account || !account.refresh_token) {
     return NextResponse.json(
-      { error: "No Spotify account connected. Visit /api/auth/login first." },
+      {
+        ok: false,
+        error: "No Spotify account connected. Visit /api/auth/login first.",
+        connected: false,
+      },
       { status: 428 },
     );
   }

@@ -26,11 +26,30 @@ export interface AccountRow {
   tracking_started_at: Date | string | null;
 }
 
+/**
+ * Finds the account to collect for.
+ *
+ * Prefers a genuinely connected account (one holding a refresh token) over any
+ * demo/seed row, so a seeded database doesn't shadow the real user and produce
+ * a confusing failure.
+ */
 export async function getAccount(db: Db, userId?: string): Promise<AccountRow | null> {
   const { rows } = userId
     ? await db.query<AccountRow>(`select * from spotify_accounts where id = $1`, [userId])
-    : await db.query<AccountRow>(`select * from spotify_accounts order by created_at limit 1`);
+    : await db.query<AccountRow>(
+        `select * from spotify_accounts
+          order by (refresh_token is not null) desc, created_at
+          limit 1`,
+      );
   return rows[0] ?? null;
+}
+
+/** True when at least one account has completed the OAuth handshake. */
+export async function hasConnectedAccount(db: Db): Promise<boolean> {
+  const { rows } = await db.query<{ n: string }>(
+    `select count(*) as n from spotify_accounts where refresh_token is not null`,
+  );
+  return Number(rows[0].n) > 0;
 }
 
 export async function saveTokens(
