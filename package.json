@@ -11,7 +11,8 @@
     "db:seed": "tsx scripts/seed.ts",
     "db:reset": "rm -rf .pglite && tsx scripts/seed.ts",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:check": "tsx scripts/check-db.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8",
