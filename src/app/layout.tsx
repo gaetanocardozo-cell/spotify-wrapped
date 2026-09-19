@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 const fontStack =
   'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"';
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="h-full antialiased" style={{ fontFamily: fontStack }}>
       <body className="min-h-full flex flex-col bg-[#0a0a0b]">{children}</body>
