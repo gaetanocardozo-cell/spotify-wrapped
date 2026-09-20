@@ -24,14 +24,38 @@ See [`PLAN.md`](./PLAN.md) for the full architecture and roadmap.
 
 ## Quick start
 
+### 1. Look around with synthetic data (no accounts needed)
+
 ```bash
 npm install
 cp .env.example .env.local
-npm run db:seed      # creates a local Postgres (PGlite) and loads ~540 days of synthetic history
+npm run db:seed      # local Postgres (PGlite) + ~540 days of synthetic history
 npm run dev
 ```
 
-Open http://localhost:3000.
+Open <http://127.0.0.1:3000>. The four tabs work against generated data; the
+**Connect Spotify** button stays disabled until step 2.
+
+### 2. Connect your real account
+
+Edit `.env.local` and fill in the four values it asks for:
+
+```bash
+SPOTIFY_CLIENT_ID=...          # developer.spotify.com/dashboard -> Settings
+SPOTIFY_CLIENT_SECRET=...      # same page, "View client secret"
+TOKEN_ENCRYPTION_KEY=...       # openssl rand -base64 32
+CRON_SECRET=...                # openssl rand -hex 32
+```
+
+Register `http://127.0.0.1:3000/api/auth/callback` as a redirect URI on the Spotify
+app. **Restart the dev server** (env changes are only read at boot), then click
+**Connect Spotify**.
+
+> Use `127.0.0.1`, not `localhost` — Spotify rejects the hostname `localhost`
+> outright, and the redirect URI must match character for character.
+
+From that click onward your listening history accumulates. See
+[`SETUP.md`](./SETUP.md) for the full walkthrough including Supabase and deployment.
 
 ### Scripts
 

@@ -1,4 +1,5 @@
 import { getDb } from "@/lib/db";
+import { checkSpotifyEnv } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
@@ -138,6 +139,7 @@ export default async function Home({
 }) {
   const params = await searchParams;
   const data = await load();
+  const envIssues = checkSpotifyEnv();
   const fmt = (n: number) => n.toLocaleString("en-US");
   const day = (s: string | null) => (s ? s.slice(0, 10) : "—");
 
@@ -201,11 +203,40 @@ export default async function Home({
             </div>
             <a
               href="/api/auth/login"
-              className="rounded-full bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-black transition hover:bg-emerald-400"
+              aria-disabled={envIssues.length > 0}
+              className={
+                "rounded-full px-5 py-2.5 text-sm font-semibold transition " +
+                (envIssues.length > 0
+                  ? "pointer-events-none bg-white/10 text-white/30"
+                  : "bg-emerald-500 text-black hover:bg-emerald-400")
+              }
             >
               {connected ? "Reconnect" : "Connect Spotify"}
             </a>
           </div>
+
+          {envIssues.length > 0 && (
+            <div className="mt-5 rounded-lg border border-amber-500/25 bg-amber-500/5 p-4">
+              <p className="text-sm font-medium text-amber-200">
+                Finish configuring <code className="rounded bg-black/40 px-1.5 py-0.5">.env.local</code>{" "}
+                before connecting
+              </p>
+              <ul className="mt-3 space-y-2">
+                {envIssues.map((issue) => (
+                  <li key={issue.key} className="text-xs text-amber-200/70">
+                    <code className="rounded bg-black/30 px-1.5 py-0.5 text-amber-200">
+                      {issue.key}
+                    </code>{" "}
+                    {issue.problem} — {issue.fix}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-3 text-xs text-amber-200/50">
+                Start from the template: <code className="rounded bg-black/30 px-1.5 py-0.5">cp .env.example .env.local</code>,
+                then restart the dev server so it picks up the changes.
+              </p>
+            </div>
+          )}
         </section>
 
         {data ? (

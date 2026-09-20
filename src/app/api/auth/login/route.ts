@@ -3,14 +3,17 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { authorizeUrl } from "@/lib/spotify/client";
 import { resolveRedirectUri } from "@/lib/spotify/redirect";
+import { checkSpotifyEnv } from "@/lib/env";
 
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
-  if (!process.env.SPOTIFY_CLIENT_ID) {
-    return NextResponse.json(
-      { error: "SPOTIFY_CLIENT_ID is not set. See SETUP.md." },
-      { status: 500 },
+  // Fail with instructions rather than a bare "not set".
+  const issues = checkSpotifyEnv();
+  if (issues.length > 0) {
+    const summary = issues.map((i) => `${i.key} ${i.problem}`).join("; ");
+    return NextResponse.redirect(
+      new URL(`/?auth_error=${encodeURIComponent(summary)}`, new URL(request.url).origin),
     );
   }
 
