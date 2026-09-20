@@ -58,3 +58,22 @@ describe("localhost / 127.0.0.1 origin split", () => {
     expect(resolveRedirectUri(req)).toBe("http://127.0.0.1:4123/api/auth/callback");
   });
 });
+
+describe("GitHub Codespaces forwarded ports", () => {
+  const host = "humble-waffle-p7g7jgjgqrv7f6v5g-3000.app.github.dev";
+
+  it("uses the forwarded host over https, not the bind address", () => {
+    // Codespaces terminates TLS at its proxy and forwards plain http inside.
+    const req = new Request("http://0.0.0.0:3000/api/auth/login", {
+      headers: { host, "x-forwarded-host": host, "x-forwarded-proto": "https" },
+    });
+    expect(resolveRedirectUri(req)).toBe(`https://${host}/api/auth/callback`);
+  });
+
+  it("forces https even when the proxy reports http", () => {
+    const req = new Request("http://0.0.0.0:3000/api/auth/login", {
+      headers: { host, "x-forwarded-proto": "http" },
+    });
+    expect(resolveRedirectUri(req)).toBe(`https://${host}/api/auth/callback`);
+  });
+});

@@ -96,6 +96,20 @@ async function main() {
   }
 
   // -------------------------------------------------------------------------
+  // Codespaces / devcontainers: the forwarded-port hostname is the only URL
+  // that reaches the app, so that is what must be registered with Spotify.
+  const csName = process.env.CODESPACE_NAME;
+  const csDomain = process.env.GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN;
+  if (csName && csDomain) {
+    const csUri = `https://${csName}-3000.${csDomain}/api/auth/callback`;
+    warn(
+      "GitHub Codespaces detected — 127.0.0.1 will NOT work here.",
+      `Register this redirect URI in the Spotify dashboard:\n    ${csUri}\n` +
+        "  Also set the forwarded port's visibility to Public, or Spotify's\n" +
+        "  redirect back will hit the Codespaces login wall.",
+    );
+  }
+
   section("2. Network reachability");
 
   try {

@@ -296,3 +296,29 @@ If it persists, confirm the dev server really is on port 3000 — plain
 `next dev` silently moves to 3001 when the port is taken, which sends a
 `redirect_uri` you never registered. `npm run dev` now pins `-p 3000` so a
 collision fails loudly instead.
+
+### Running in GitHub Codespaces
+
+Codespaces does not expose the app on `127.0.0.1` from your browser's point of
+view — it serves it from a forwarded-port hostname like:
+
+    https://<codespace-name>-3000.app.github.dev
+
+That hostname is the redirect URI Spotify will be given, so **it is the one you
+must register**, in addition to (or instead of) the loopback one:
+
+    https://<codespace-name>-3000.app.github.dev/api/auth/callback
+
+Two extra requirements:
+
+1. **Set the port to Public.** In the Ports panel, right-click port 3000 →
+   Port Visibility → Public. If it stays Private, Spotify's redirect back lands
+   on the GitHub login wall and the flow dies with the code still unexchanged.
+2. **The hostname changes if the Codespace is rebuilt.** When that happens the
+   old redirect URI stops matching and you must register the new one. To avoid
+   re-registering, pin it instead:
+
+       SPOTIFY_REDIRECT_URI=https://<codespace-name>-3000.app.github.dev/api/auth/callback
+
+`npm run spotify:doctor` now detects Codespaces and prints the exact URI to
+register.

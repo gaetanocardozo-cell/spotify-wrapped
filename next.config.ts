@@ -8,7 +8,13 @@ const nextConfig: NextConfig = {
   // HMR socket) unless the host is allowlisted. Sandbox preview URLs are
   // proxied under *.e2b.app and their subdomain changes whenever the sandbox
   // is recreated, so allow the pattern rather than a specific hostname.
-  allowedDevOrigins: ["*.e2b.app", "*.vercel.app", "127.0.0.1", "localhost"],
+  allowedDevOrigins: [
+    "*.e2b.app",
+    "*.vercel.app",
+    "*.app.github.dev", // GitHub Codespaces forwarded ports
+    "127.0.0.1",
+    "localhost",
+  ],
 };
 
 export default nextConfig;
