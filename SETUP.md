@@ -212,3 +212,68 @@ Import the repo on Vercel, set the same environment variables, and add
 
 You will need to click **Connect Spotify** once on the deployed URL too, since the
 encrypted refresh token is tied to the redirect URI it was issued for.
+
+
+---
+
+# Troubleshooting: "I can't connect my Spotify account"
+
+Run the diagnostic first — it checks each failure mode in the order it bites:
+
+```bash
+npm run spotify:doctor
+```
+
+It verifies your credentials against Spotify's token endpoint, probes whether the
+redirect URI is registered, and prints the development-mode rules that silently
+block OAuth. Nothing is printed in full: secrets are shown only as fingerprints.
+
+## The two rules that break this for almost everyone
+
+Spotify tightened **Development Mode** in February/March 2026. Both of these are
+mandatory, and neither produces an obvious error message.
+
+### 1. The app owner needs Spotify Premium
+
+Development-mode apps **stop working entirely** if the owner's Premium subscription
+lapses. A Free account cannot use the Web API at all. This is new as of March 2026.
+
+### 2. You must add yourself to the app's allowlist
+
+This is the one that catches everybody. Even as the app's creator, **your own
+account is not automatically authorized.**
+
+1. <https://developer.spotify.com/dashboard> → your app
+2. **User Management** tab
+3. Add your **full name** and the **exact email** on your Spotify account
+4. Get that email from <https://spotify.com/account/profile> — copy it, don't type it
+
+Changes can take **up to ~15 minutes** to take effect.
+
+If you are not allowlisted, the consent screen appears to work, then the callback
+fails with `403 User not approved for app` when the app calls `/v1/me`.
+
+Development mode now allows a maximum of **5 users** per app.
+
+## Other things worth checking
+
+| Symptom | Cause |
+|---|---|
+| `INVALID_CLIENT: Invalid redirect URI` | The URI isn't registered, or doesn't match character for character. Check the trailing slash, the port, and `http` vs `https`. |
+| Browser shows `localhost` in the URL bar | Spotify rejects `localhost`. Open `http://127.0.0.1:3000` instead. |
+| `invalid_client` from the token endpoint | Wrong Client ID/Secret. If you rotated the secret, the old one died instantly. |
+| Nothing changes after editing `.env.local` | Next.js reads env only at boot — **restart the dev server**. |
+| Worked before, fails now | Refresh tokens now expire **6 months** after the original authorization (2026 change). Reconnect. |
+| Stale consent | Remove the app at <https://spotify.com/account/apps>, clear cookies, try a private window. |
+
+## Still stuck?
+
+Run this and send me the output — it reveals the real error, which the browser
+usually hides behind a generic redirect:
+
+```bash
+npm run spotify:doctor
+```
+
+Plus the exact URL you land on when it fails (the `error=` query parameter is the
+useful part), and anything logged in the terminal running `npm run dev`.

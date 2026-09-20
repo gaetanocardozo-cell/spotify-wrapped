@@ -41,6 +41,24 @@ export class SpotifyError extends Error {
     super(`Spotify ${status} for ${url}: ${body.slice(0, 300)}`);
     this.name = "SpotifyError";
   }
+
+  /** Actionable explanation for the failure modes that actually occur. */
+  get hint(): string | null {
+    if (this.status === 403) {
+      return (
+        "403 usually means this Spotify account is not on the app's " +
+        "development-mode allowlist. Add it under Dashboard -> your app -> " +
+        "User Management (exact email), and confirm the app owner has Premium."
+      );
+    }
+    if (this.status === 401) {
+      return "401 means the access token is invalid or expired.";
+    }
+    if (this.status === 429) {
+      return "429 means rate-limited or the development-mode quota is exhausted.";
+    }
+    return null;
+  }
 }
 
 export interface TokenSet {

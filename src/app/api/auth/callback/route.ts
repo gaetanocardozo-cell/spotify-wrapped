@@ -68,9 +68,23 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL("/?connected=1", url.origin));
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    console.error("[oauth callback]", message);
+
+    // A 403 here almost always means the Spotify account isn't on the app's
+    // development-mode allowlist. The raw message ("User not approved for
+    // app") is too cryptic to act on, so translate it.
+    const friendly = /403/.test(message)
+      ? "Spotify returned 403. Your account is probably not on the app's allowlist. " +
+        "Go to developer.spotify.com/dashboard → your app → User Management, and add " +
+        "your full name plus the exact email from spotify.com/account/profile. " +
+        "Also confirm the app owner has Premium. Changes take up to 15 minutes."
+      : message;
+
+    console.error("[oauth callback] FAILED:", message);
+    console.error("[oauth callback] redirect_uri used:", redirectUri);
+    console.error("[oauth callback] Run `npm run spotify:doctor` to diagnose.");
+
     return NextResponse.redirect(
-      new URL(`/?auth_error=${encodeURIComponent(message.slice(0, 200))}`, url.origin),
+      new URL(`/?auth_error=${encodeURIComponent(friendly.slice(0, 400))}`, url.origin),
     );
   }
 }
