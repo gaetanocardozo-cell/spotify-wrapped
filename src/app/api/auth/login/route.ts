@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { authorizeUrl } from "@/lib/spotify/client";
 import { resolveRedirectUri } from "@/lib/spotify/redirect";
 import { checkSpotifyEnv } from "@/lib/env";
+import { resolveAppOrigin, isSecureRequest } from "@/lib/spotify/origin";
 
 export const runtime = "nodejs";
 
@@ -13,7 +14,7 @@ export async function GET(request: Request) {
   if (issues.length > 0) {
     const summary = issues.map((i) => `${i.key} ${i.problem}`).join("; ");
     return NextResponse.redirect(
-      new URL(`/?auth_error=${encodeURIComponent(summary)}`, new URL(request.url).origin),
+      new URL(`/?auth_error=${encodeURIComponent(summary)}`, resolveAppOrigin(request)),
     );
   }
 
@@ -25,12 +26,15 @@ export async function GET(request: Request) {
   // NB: request.url reports the *bind* address (e.g. 0.0.0.0:3000), not the
   // host the browser typed, so the Host header is the only reliable source.
   const hostHeader = request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? "";
-  if (hostHeader === "localhost" || hostHeader.startsWith("localhost:")) {
+  const isProxied = request.headers.get("x-forwarded-host") !== null;
+  if (!isProxied && (hostHeader === "localhost" || hostHeader.startsWith("localhost:"))) {
     const here = new URL(request.url);
     here.protocol = "http:";
     here.host = hostHeader.replace("localhost", "127.0.0.1");
     return NextResponse.redirect(here, { status: 307 });
   }
+
+  const secure = isSecureRequest(request);
 
   // CSRF protection: a random state echoed back by Spotify and compared.
   const state = randomBytes(16).toString("hex");
@@ -38,7 +42,7 @@ export async function GET(request: Request) {
   jar.set("spotify_oauth_state", state, {
     httpOnly: true,
     sameSite: "lax",
-    secure: new URL(request.url).protocol === "https:",
+    secure,
     path: "/",
     maxAge: 600,
   });
@@ -48,7 +52,7 @@ export async function GET(request: Request) {
   jar.set("spotify_redirect_uri", redirectUri, {
     httpOnly: true,
     sameSite: "lax",
-    secure: new URL(request.url).protocol === "https:",
+    secure,
     path: "/",
     maxAge: 600,
   });

@@ -5,27 +5,31 @@ import { migrate } from "@/lib/db/migrate";
 import { exchangeCode, getMe } from "@/lib/spotify/client";
 import { saveTokens } from "@/lib/spotify/tokens";
 import { resolveRedirectUri } from "@/lib/spotify/redirect";
+import { resolveAppOrigin } from "@/lib/spotify/origin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
+  // NOT url.origin: behind a proxy that is the bind address (0.0.0.0), which
+  // the browser cannot reach.
+  const origin = resolveAppOrigin(request);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
   const error = url.searchParams.get("error");
 
   if (error) {
-    return NextResponse.redirect(new URL(`/?auth_error=${encodeURIComponent(error)}`, url.origin));
+    return NextResponse.redirect(new URL(`/?auth_error=${encodeURIComponent(error)}`, origin));
   }
   if (!code) {
-    return NextResponse.redirect(new URL("/?auth_error=missing_code", url.origin));
+    return NextResponse.redirect(new URL("/?auth_error=missing_code", origin));
   }
 
   const jar = await cookies();
   const expectedState = jar.get("spotify_oauth_state")?.value;
   if (!expectedState || state !== expectedState) {
-    return NextResponse.redirect(new URL("/?auth_error=state_mismatch", url.origin));
+    return NextResponse.redirect(new URL("/?auth_error=state_mismatch", origin));
   }
 
   // Must be byte-identical to the URI used in the authorize step.
@@ -65,7 +69,7 @@ export async function GET(request: Request) {
     jar.delete("spotify_oauth_state");
     jar.delete("spotify_redirect_uri");
 
-    return NextResponse.redirect(new URL("/?connected=1", url.origin));
+    return NextResponse.redirect(new URL("/?connected=1", origin));
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
 
@@ -84,7 +88,7 @@ export async function GET(request: Request) {
     console.error("[oauth callback] Run `npm run spotify:doctor` to diagnose.");
 
     return NextResponse.redirect(
-      new URL(`/?auth_error=${encodeURIComponent(friendly.slice(0, 400))}`, url.origin),
+      new URL(`/?auth_error=${encodeURIComponent(friendly.slice(0, 400))}`, origin),
     );
   }
 }
