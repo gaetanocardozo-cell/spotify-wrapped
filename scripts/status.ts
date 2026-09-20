@@ -95,20 +95,40 @@ async function main() {
 
   // 4. What has actually landed in our database so far?
   console.log(`\n${BOLD}4. Collected so far${RESET}`);
-  const { rows } = await db.query<{ plays: string; minutes: string; last: string | null }>(`
-    select count(*)::text                                         as plays,
-           coalesce(round(sum(est_ms_played)/60000.0),0)::text     as minutes,
-           max(played_at)::text                                    as last
+  // Break down per user_id: the synthetic seed lives under 'demo-user' and
+  // would otherwise be indistinguishable from real collected history.
+  const { rows } = await db.query<{
+    user_id: string;
+    plays: string;
+    minutes: string;
+    last: string | null;
+  }>(`
+    select user_id,
+           count(*)::text                                      as plays,
+           coalesce(round(sum(est_ms_played)/60000.0),0)::text  as minutes,
+           max(played_at)::text                                 as last
     from plays
+    group by user_id
+    order by count(*) desc
   `);
-  const r = rows[0];
-  if (Number(r.plays) === 0) {
+
+  const mine = rows.find((x) => x.user_id === account.id);
+  const demo = rows.filter((x) => x.user_id !== account.id);
+
+  if (!mine || Number(mine.plays) === 0) {
     warn(
-      "0 plays stored — normal right after connecting.",
-      "Run the collector: npm run ingest",
+      "0 real plays collected yet — normal right after connecting.",
+      "Play something for >30s, then run: npm run ingest",
     );
   } else {
-    ok(`${r.plays} plays / ${r.minutes} minutes, most recent ${r.last}`);
+    ok(`${mine.plays} real plays / ${mine.minutes} min, most recent ${mine.last}`);
+  }
+
+  for (const d of demo) {
+    warn(
+      `${d.plays} SYNTHETIC plays under '${d.user_id}' (seed data, not yours).`,
+      "Clear it before trusting the dashboards: npm run db:clear-demo",
+    );
   }
 
   console.log(

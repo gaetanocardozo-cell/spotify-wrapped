@@ -16,7 +16,8 @@
     "spotify:doctor": "tsx --env-file=.env.local scripts/diagnose.ts",
     "dev:sandbox": "next dev -H 0.0.0.0 -p 3000",
     "spotify:status": "tsx --env-file=.env.local scripts/status.ts",
-    "ingest": "tsx --env-file=.env.local scripts/ingest.ts"
+    "ingest": "tsx --env-file=.env.local scripts/ingest.ts",
+    "db:clear-demo": "tsx --env-file=.env.local scripts/clear-demo.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8",
