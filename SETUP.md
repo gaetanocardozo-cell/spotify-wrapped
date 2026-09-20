@@ -322,3 +322,86 @@ Two extra requirements:
 
 `npm run spotify:doctor` now detects Codespaces and prints the exact URI to
 register.
+
+---
+
+## Going live: persistent database + continuous collection
+
+Until both of these are done, listening history is being lost. Spotify only
+exposes the **50 most recent plays**, so any gap longer than 50 plays is
+unrecoverable — there is no backfill.
+
+### Step 1 — Move off the local file database
+
+`DATABASE_DRIVER=pglite` writes to a file inside your dev environment. In a
+Codespace that disappears when the container is rebuilt. Switch to Supabase:
+
+```bash
+# .env.local
+DATABASE_DRIVER=postgres
+```
+
+Then verify and create the schema:
+
+```bash
+npm run db:check     # confirms DATABASE_URL connects
+npm run db:migrate   # creates the tables in Supabase
+npm run spotify:status
+```
+
+`db:check` failing with `ECONNRESET` usually means the connection string is the
+direct one (IPv6-only) rather than the **Session pooler** string. Copy it fresh
+from Supabase → Connect → Session pooler.
+
+Reconnect Spotify once after switching, since the tokens live in the database
+you just moved away from.
+
+### Step 2 — Deploy to Vercel
+
+```bash
+npx vercel --prod
+```
+
+Set these environment variables in the Vercel project (Settings → Environment
+Variables) — they are NOT read from `.env.local`:
+
+| Variable | Notes |
+| --- | --- |
+| `DATABASE_DRIVER` | `postgres` |
+| `DATABASE_URL` | Supabase session-pooler string |
+| `SPOTIFY_CLIENT_ID` | |
+| `SPOTIFY_CLIENT_SECRET` | |
+| `TOKEN_ENCRYPTION_KEY` | **Must match** whatever encrypted the stored tokens |
+| `CRON_SECRET` | Protects the ingest endpoint |
+| `APP_TIMEZONE` | `America/Bogota` |
+
+Then add the production redirect URI in the Spotify dashboard:
+
+    https://<your-app>.vercel.app/api/auth/callback
+
+and click **Connect Spotify** once on the deployed site.
+
+### Step 3 — Schedule collection every 15 minutes
+
+Vercel's **Hobby plan rejects any cron more frequent than once per day** — the
+deploy fails outright with "Hobby accounts are limited to daily Cron Jobs". A
+daily poll is not enough: more than 50 plays in a day means permanent loss.
+
+So `vercel.json` keeps a daily run as a safety net, and the real cadence comes
+from the GitHub Actions workflow in `.github/workflows/collect.yml`, which calls
+the same endpoint every 15 minutes for free.
+
+Add two repository secrets under **Settings → Secrets and variables → Actions**:
+
+| Secret | Value |
+| --- | --- |
+| `INGEST_URL` | `https://<your-app>.vercel.app/api/cron/ingest` |
+| `CRON_SECRET` | Same value as the Vercel env var |
+
+Then run it once manually from the **Actions** tab (**Collect listening
+history** → Run workflow) to confirm it returns HTTP 200 rather than 401
+(wrong secret) or 428 (Spotify not connected on the deployment).
+
+> GitHub delays or drops scheduled runs when its infrastructure is busy, so
+> treat 15 minutes as approximate. If you are a heavy listener, Vercel Pro's
+> per-minute cron is the more reliable option.
