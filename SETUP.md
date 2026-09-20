@@ -277,3 +277,22 @@ npm run spotify:doctor
 
 Plus the exact URL you land on when it fails (the `error=` query parameter is the
 useful part), and anything logged in the terminal running `npm run dev`.
+
+### "localhost rejected the connection" when I click Connect Spotify
+
+The site loads fine, but clicking Connect gives a browser connection error.
+
+Spotify forbids `localhost` as a redirect host, so the callback always returns
+to `127.0.0.1`. Browsers treat `localhost` and `127.0.0.1` as **different
+origins**, so starting the flow on one and finishing on the other loses the
+state cookie — and if your dev server is bound IPv4-only while the browser
+resolves `localhost` to IPv6 `::1`, the connection is refused outright.
+
+The login route now bounces you to `127.0.0.1` before the handshake begins, so
+either address works. To avoid it entirely, browse to
+**http://127.0.0.1:3000** rather than `http://localhost:3000`.
+
+If it persists, confirm the dev server really is on port 3000 — plain
+`next dev` silently moves to 3001 when the port is taken, which sends a
+`redirect_uri` you never registered. `npm run dev` now pins `-p 3000` so a
+collision fails loudly instead.

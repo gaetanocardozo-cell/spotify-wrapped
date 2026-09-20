@@ -17,6 +17,21 @@ export async function GET(request: Request) {
     );
   }
 
+  // Spotify forbids "localhost" as a redirect host, so the callback always
+  // comes back to 127.0.0.1. The browser treats those as *different origins*,
+  // meaning the state cookie we are about to set on localhost would not be
+  // readable by the callback. Move the user onto the loopback origin first so
+  // the whole handshake happens on a single origin.
+  // NB: request.url reports the *bind* address (e.g. 0.0.0.0:3000), not the
+  // host the browser typed, so the Host header is the only reliable source.
+  const hostHeader = request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? "";
+  if (hostHeader === "localhost" || hostHeader.startsWith("localhost:")) {
+    const here = new URL(request.url);
+    here.protocol = "http:";
+    here.host = hostHeader.replace("localhost", "127.0.0.1");
+    return NextResponse.redirect(here, { status: 307 });
+  }
+
   // CSRF protection: a random state echoed back by Spotify and compared.
   const state = randomBytes(16).toString("hex");
   const jar = await cookies();

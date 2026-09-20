@@ -42,3 +42,19 @@ describe("resolveRedirectUri", () => {
     );
   });
 });
+
+describe("localhost / 127.0.0.1 origin split", () => {
+  it("rewrites a localhost host to the loopback literal Spotify accepts", () => {
+    const req = new Request("http://localhost:3000/api/auth/login", {
+      headers: { host: "localhost:3000" },
+    });
+    expect(resolveRedirectUri(req)).toBe("http://127.0.0.1:3000/api/auth/callback");
+  });
+
+  it("preserves a non-default port when rewriting", () => {
+    const req = new Request("http://localhost:4123/api/auth/login", {
+      headers: { host: "localhost:4123" },
+    });
+    expect(resolveRedirectUri(req)).toBe("http://127.0.0.1:4123/api/auth/callback");
+  });
+});

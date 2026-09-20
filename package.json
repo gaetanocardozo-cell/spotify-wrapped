@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -H 0.0.0.0 -p 3000",
+    "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -13,7 +13,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "db:check": "tsx --env-file=.env.local scripts/check-db.ts",
-    "spotify:doctor": "tsx --env-file=.env.local scripts/diagnose.ts"
+    "spotify:doctor": "tsx --env-file=.env.local scripts/diagnose.ts",
+    "dev:sandbox": "next dev -H 0.0.0.0 -p 3000"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8",
