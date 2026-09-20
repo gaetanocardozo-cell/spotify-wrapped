@@ -161,24 +161,98 @@ async function main() {
   try {
     const res = await fetch(authorizeUrl, { redirect: "manual" });
     const location = res.headers.get("location") ?? "";
-    const text = res.status < 400 ? "" : await res.text().catch(() => "");
+    const body = res.status >= 400 || location ? await res.text().catch(() => "") : "";
+    const haystack = `${location} ${body}`;
 
-    if (location.includes("error=invalid_redirect_uri") || text.includes("INVALID_CLIENT")) {
+    // Spotify signals an unregistered/mismatched URI several different ways
+    // depending on which layer rejects it.
+    if (/INVALID_CLIENT|invalid_redirect_uri|Invalid redirect URI/i.test(haystack)) {
       bad(
-        `Redirect URI not registered: ${testUri}`,
-        "Dashboard → Settings → Edit → Redirect URIs → add it exactly, then Save.",
+        `Redirect URI REJECTED: ${testUri}`,
+        "Dashboard → your app → Settings → Edit → Redirect URIs. Add it exactly " +
+          "(no trailing slash, port 3000, http not https), press Add, then SAVE.",
       );
-    } else if (res.status === 200 || location.includes("accounts.spotify.com")) {
-      ok(`Redirect URI accepted: ${testUri}`);
+    } else if (/error=/.test(location)) {
+      const err = new URL(location, "https://accounts.spotify.com").searchParams.get("error");
+      bad(`Authorize rejected with error=${err}`, "See the Spotify docs for this error code.");
     } else {
-      warn(`Unexpected authorize response (HTTP ${res.status})`, location || text.slice(0, 200));
+      // A login page (200) or a redirect to the login flow both mean the
+      // client_id + redirect_uri pair was accepted.
+      ok(`Redirect URI accepted: ${testUri}`);
     }
   } catch (e) {
     warn(`Could not probe /authorize: ${(e as Error).message}`);
   }
 
+  // Warn about URIs that are registered but won't be the one actually used.
+  if (!redirectUri) {
+    console.log(
+      `  ${DIM}Note: the app derives the redirect URI from each request. Running on\n` +
+        `  a port other than 3000 will send a URI you may not have registered.${RESET}`,
+    );
+  }
+
   // -------------------------------------------------------------------------
-  section("5. Development-mode requirements (2026 rules)");
+  section("5. Is an existing token stored? (tests the allowlist directly)");
+
+  // If a refresh token is already stored we can call /v1/me and observe the
+  // real 403, which is the only definitive test for allowlist membership.
+  try {
+    const { getDb } = await import("../src/lib/db");
+    const { getAccount } = await import("../src/lib/spotify/tokens");
+    const { decrypt } = await import("../src/lib/crypto");
+
+    const db = await getDb();
+    const account = await getAccount(db);
+
+    if (!account?.refresh_token) {
+      console.log(`  ${DIM}No stored token yet — nothing to test. Expected before first connect.${RESET}`);
+    } else {
+      const refreshRes = await fetch("https://accounts.spotify.com/api/token", {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          grant_type: "refresh_token",
+          refresh_token: decrypt(account.refresh_token),
+        }),
+      });
+
+      if (!refreshRes.ok) {
+        const err = (await refreshRes.json()) as Record<string, unknown>;
+        bad(
+          `Stored refresh token rejected: ${JSON.stringify(err)}`,
+          "Reconnect. Note refresh tokens now expire 6 months after the original authorization.",
+        );
+      } else {
+        const { access_token } = (await refreshRes.json()) as { access_token: string };
+        const meRes = await fetch("https://api.spotify.com/v1/me", {
+          headers: { Authorization: `Bearer ${access_token}` },
+        });
+
+        if (meRes.status === 403) {
+          bad(
+            "403 from /v1/me — YOUR ACCOUNT IS NOT ON THE ALLOWLIST",
+            "Dashboard → your app → User Management → add your full name and the " +
+              "exact email from spotify.com/account/profile. Wait ~15 minutes.",
+          );
+        } else if (meRes.ok) {
+          const me = (await meRes.json()) as { id: string; display_name?: string };
+          ok(`/v1/me works — connected as ${me.display_name ?? me.id}. Allowlist is fine.`);
+        } else {
+          bad(`/v1/me returned ${meRes.status}`, (await meRes.text()).slice(0, 200));
+        }
+      }
+    }
+    await db.close();
+  } catch (e) {
+    console.log(`  ${DIM}Could not check stored token: ${(e as Error).message}${RESET}`);
+  }
+
+  // -------------------------------------------------------------------------
+  section("6. Development-mode requirements (2026 rules)");
 
   console.log(
     `  ${DIM}Spotify tightened Development Mode in Feb/Mar 2026. These are the\n` +
